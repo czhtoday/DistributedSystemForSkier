@@ -7,6 +7,7 @@ import com.upic.queue.MessageQueueProducer;
 
 
 import java.io.BufferedReader;
+import java.util.Map;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -14,6 +15,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
+import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
 
 /**
  * Servlet for handling skier lift ride events.
@@ -114,6 +119,65 @@ public class SkierServlet extends HttpServlet {
             sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
         }
     }
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws ServletException, IOException {
+
+        String pathInfo = request.getPathInfo(); // e.g. /12345/vertical
+        String[] parts = pathInfo.split("/");
+
+        // Handle GET /skiers/{skierID}/vertical
+        if (parts.length == 3 && parts[1].matches("\\d+") && parts[2].equals("vertical")) {
+            try {
+                int skierID = Integer.parseInt(parts[1]);
+                handleGetVertical(skierID, response);
+            } catch (NumberFormatException e) {
+                sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid skierID");
+            }
+            return;
+        }
+
+        // Handle GET/resorts/{resortID}/seasons/{seasonID}/day/{dayID}/skiers
+        // Handle GET/skiers/{resortID}/seasons/{seasonID}/days/{dayID}/skiers/{skierID}
+        sendErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, "Unknown GET path");
+    }
+
+
+    private void handleGetVertical(int skierID, HttpServletResponse response) throws IOException {
+        try {
+            DynamoDbClient dynamoDbClient = DynamoDbClient.create();
+            String prefix = "2025_"; // fixed season
+            QueryRequest request = QueryRequest.builder()
+                .tableName("LiftRides")
+                .keyConditionExpression("skierID = :skierID AND begins_with(dateKey, :prefix)")
+                .expressionAttributeValues(Map.of(
+                    ":skierID", AttributeValue.builder().n(String.valueOf(skierID)).build(),
+                    ":prefix", AttributeValue.builder().s(prefix).build()
+                ))
+                .build();
+
+            QueryResponse result = dynamoDbClient.query(request);
+
+            int totalVertical = result.items().stream()
+                .mapToInt(item -> Integer.parseInt(item.get("vertical").n()))
+                .sum();
+
+            String json = gson.toJson(Map.of("skierID", skierID, "totalVertical", totalVertical));
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.setContentType("application/json");
+            response.getWriter().write(json);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to get vertical");
+        }
+    }
+
+
+
+
+
     /**
      * Utility method to send a JSON error response.
      */
