@@ -205,7 +205,6 @@ public class SkierServlet extends HttpServlet {
                 String seasonID = parts[3];
                 String dayID = parts[5];
 
-                System.out.println("处理resorts路径: resort=" + resortID + ", season=" + seasonID + ", day=" + dayID);
                 handleGetSkiersByDay(resortID, seasonID, dayID, response);
                 return;
             } catch (NumberFormatException e) {
@@ -223,10 +222,10 @@ public class SkierServlet extends HttpServlet {
     }
 
 
-
     private void handleGetVertical(int skierID, HttpServletResponse response) throws IOException {
         try {
             DynamoDbClient dynamoDbClient = DynamoDbClient.create();
+
             String prefix = "2025_"; // fixed season
             QueryRequest request = QueryRequest.builder()
                     .tableName("LiftRides")
@@ -348,6 +347,7 @@ public class SkierServlet extends HttpServlet {
     private void handleGetSkiersByDay(int resortID, String seasonID, String dayID, HttpServletResponse response) throws IOException {
         try {
             DynamoDbClient dynamoDbClient = DynamoDbClient.create();
+
             // Create the dateKey prefix for queries (matches how data is stored in DynamoDB)
             String dateKeyPrefix = seasonID + "_" + dayID + "_";
 
