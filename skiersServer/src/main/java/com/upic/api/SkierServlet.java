@@ -6,8 +6,8 @@ import com.upic.model.LiftRide;
 import com.upic.queue.MessageQueueProducer;
 
 
-import java.io.BufferedReader;
-import java.util.*;
+
+
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -16,6 +16,12 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.InputStream;
+import java.io.BufferedReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.HashMap;
 
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -215,6 +221,15 @@ public class SkierServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Handler for GET API: GET/skiers/{resortID}/seasons/{seasonID}/days/{dayID}/skiers/{skierID}
+     * @param resortID
+     * @param seasonID
+     * @param dayID
+     * @param skierID
+     * @param response
+     * @throws IOException
+     */
 
     private void handleGetSkierDayData(int resortID, String seasonID, String dayID, int skierID,
                                        HttpServletResponse response) throws IOException {
