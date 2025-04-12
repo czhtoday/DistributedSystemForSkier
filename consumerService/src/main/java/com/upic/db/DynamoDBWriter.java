@@ -36,6 +36,9 @@ public class DynamoDBWriter {
     try {
       // As seasonID and dayID is fixed, add a random number to avoid hot partition
       String dateKey = seasonID + "_" + dayID + "_" + getRandomSuffix();
+      // create seasonDaySkier combined-key for GSI
+      String seasonDaySkier = seasonID + "_" + dayID + "_" + skierID;
+
       int vertical = liftRide.getLiftID() * 10;
 
       Map<String, AttributeValue> item = new HashMap<>();
@@ -47,6 +50,9 @@ public class DynamoDBWriter {
       item.put("liftID", AttributeValue.builder().n(String.valueOf(liftRide.getLiftID())).build());
       item.put("time", AttributeValue.builder().n(String.valueOf(liftRide.getTime())).build());
       item.put("vertical", AttributeValue.builder().n(String.valueOf(vertical)).build());
+
+      // put combined sort key for GSI
+      item.put("seasonDaySkier", AttributeValue.builder().s(seasonDaySkier).build());
 
       // Block if queue is full (backpressure)
       bufferQueue.put(Collections.unmodifiableMap(item));
