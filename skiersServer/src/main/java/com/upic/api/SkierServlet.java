@@ -5,12 +5,6 @@ import com.google.gson.JsonSyntaxException;
 import com.upic.model.LiftRide;
 import com.upic.queue.MessageQueueProducer;
 
-
-import java.io.BufferedReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -18,6 +12,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.InputStream;
+import java.io.BufferedReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.HashMap;
+
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
@@ -45,6 +47,31 @@ import java.net.URI;
  */
 public class SkierServlet extends HttpServlet {
     private final Gson gson = new Gson(); // JSON parser for request body deserialization
+    private Properties validationProps;
+
+    /**
+     * Init and load resources file as constraints
+     * @throws ServletException
+     */
+    @Override
+    public void init() throws ServletException {
+        super.init();
+
+        // load validation.properties file
+        try {
+            validationProps = new Properties();
+            InputStream inputStream = getClass().getClassLoader().getResourceAsStream("validation.properties");
+
+            if (inputStream != null) {
+                validationProps.load(inputStream);
+                inputStream.close();
+            } else {
+                throw new ServletException("Could not find validation.properties");
+            }
+        } catch (IOException e) {
+            throw new ServletException("Error loading validation properties", e);
+        }
+    }
 
     /**
      * Handles POST requests to record a skier's lift ride event.
@@ -153,6 +180,22 @@ public class SkierServlet extends HttpServlet {
             return;
         }
 
+        // Handle GET/skiers/{resortID}/seasons/{seasonID}/days/{dayID}/skiers/{skierID}
+        if (parts.length == 8 && parts[2].equals("seasons") && parts[4].equals("days") && parts[6].equals("skiers")) {
+            try {
+                int resortID = Integer.parseInt(parts[1]);
+                String seasonID = parts[3];
+                String dayID = parts[5];
+                int skierID = Integer.parseInt(parts[7]);
+
+                handleGetSkierDayData(resortID, seasonID, dayID, skierID, response);
+                return;
+            } catch (NumberFormatException e) {
+                sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid number format in URL");
+            }
+            return;
+        }
+
         // Handle /resorts/{resortID}/seasons/{seasonID}/day/{dayID}/skiers
         if ("/resorts".equals(servletPath) && parts.length >= 7 &&
                 "seasons".equals(parts[2]) && "day".equals(parts[4]) &&
@@ -176,11 +219,10 @@ public class SkierServlet extends HttpServlet {
             }
         }
 
-        // handle /skiers/{resortID}/seasons/{seasonID}/days/{dayID}/skiers/{skierID}
-
-
         sendErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, "Unknown GET path: " + pathInfo);
     }
+
+
 
     private void handleGetVertical(int skierID, HttpServletResponse response) throws IOException {
         try {
@@ -212,6 +254,92 @@ public class SkierServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Handler for GET API: GET/skiers/{resortID}/seasons/{seasonID}/days/{dayID}/skiers/{skierID}
+     * @param resortID
+     * @param seasonID
+     * @param dayID
+     * @param skierID
+     * @param response
+     * @throws IOException
+     */
+    private void handleGetSkierDayData(int resortID, String seasonID, String dayID, int skierID,
+                                       HttpServletResponse response) throws IOException {
+        // get validation boundary from Properties
+        int resortMin = Integer.parseInt(validationProps.getProperty("validation.resort.min", "1"));
+        int resortMax = Integer.parseInt(validationProps.getProperty("validation.resort.max", "10"));
+        String seasonMin = validationProps.getProperty("validation.season.min", "2025");
+        String seasonMax = validationProps.getProperty("validation.season.max", "2025");
+        int dayMin = Integer.parseInt(validationProps.getProperty("validation.day.min", "1"));
+        int dayMax = Integer.parseInt(validationProps.getProperty("validation.day.max", "366"));
+        int skierMin = Integer.parseInt(validationProps.getProperty("validation.skier.min", "1"));
+        int skierMax = Integer.parseInt(validationProps.getProperty("validation.skier.max", "100000"));
+
+        // validate the values in URL
+        if (resortID < resortMin || resortID > resortMax ||
+                !seasonID.equals(seasonMin) || // Assume seasonID is equal to seasonMin currently
+                Integer.parseInt(dayID) < dayMin || Integer.parseInt(dayID) > dayMax ||
+                skierID < skierMin || skierID > skierMax
+        ) {
+
+            sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid path parameters");
+            return;
+        }
+
+        try {
+            DynamoDbClient dynamoDbClient = DynamoDbClient.create();
+
+            // query items by seasonID, dayID and skierID , which are combined as sortKey in GSI
+            String seasonDaySkier = seasonID + "_" + dayID + "_" + skierID;
+
+            QueryRequest request = QueryRequest.builder()
+                    .tableName("LiftRides")
+                    .indexName("resort-season-day-skier-index")
+                    .keyConditionExpression("resortID = :resortID AND seasonDaySkier = :sdsk")
+                    .expressionAttributeValues(Map.of(
+                            ":resortID", AttributeValue.builder().n(String.valueOf(resortID)).build(),
+                            ":sdsk", AttributeValue.builder().s(seasonDaySkier).build()
+                    ))
+                    .build();
+
+            QueryResponse result = dynamoDbClient.query(request);
+
+            // if not find the item
+            if (result.items().isEmpty()) {
+                sendSuccessResponse(response, HttpServletResponse.SC_OK,
+                        "No records found for skier " + skierID + " on day " + dayID);
+                return;
+            }
+
+            // Process query result，build JSON
+            List<Map<String, Object>> liftRides = new ArrayList<>();
+
+            for (Map<String, AttributeValue> item : result.items()) {
+                Map<String, Object> liftRide = new HashMap<>();
+                liftRide.put("time", Integer.parseInt(item.get("time").n()));
+                liftRide.put("liftID", Integer.parseInt(item.get("liftID").n()));
+                liftRide.put("vertical", Integer.parseInt(item.get("vertical").n()));
+                liftRides.add(liftRide);
+            }
+
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("skierID", skierID);
+            responseData.put("resortID", resortID);
+            responseData.put("seasonID", seasonID);
+            responseData.put("dayID", dayID);
+            responseData.put("liftRides", liftRides);
+
+            String json = gson.toJson(responseData);
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.setContentType("application/json");
+            response.getWriter().write(json);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Failed to get skier day data: " + e.getMessage());
+        }
+    }
 
     /**
      * Handle GET /resorts/{resortID}/seasons/{seasonID}/day/{dayID}/skiers
@@ -278,7 +406,6 @@ public class SkierServlet extends HttpServlet {
                     "Failed to get skiers for day: " + e.getMessage());
         }
     }
-
 
     /**
      * Utility method to send a JSON error response.
