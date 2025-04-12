@@ -13,6 +13,11 @@
     <url-pattern>/skiers/*</url-pattern>
   </servlet-mapping>
 
+  <servlet-mapping>
+    <servlet-name>SkierServlet</servlet-name>
+    <url-pattern>/resorts/*</url-pattern>
+  </servlet-mapping>
+
   <servlet>
     <servlet-name>HealthCheckServlet</servlet-name>
     <servlet-class>com.upic.api.HealthCheckServlet</servlet-class>

@@ -7,6 +7,9 @@ import com.upic.queue.MessageQueueProducer;
 
 
 import java.io.BufferedReader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -19,6 +22,11 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
 import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
+
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import java.net.URI;
 
 /**
  * Servlet for handling skier lift ride events.
@@ -48,7 +56,7 @@ public class SkierServlet extends HttpServlet {
      */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
 
         // Set response content type to JSON
         response.setContentType("application/json");
@@ -122,9 +130,16 @@ public class SkierServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
 
-        String pathInfo = request.getPathInfo(); // e.g. /12345/vertical
+        String pathInfo = request.getPathInfo();
+        String servletPath = request.getServletPath();
+
+        if (pathInfo == null) {
+            sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid URL format");
+            return;
+        }
+
         String[] parts = pathInfo.split("/");
 
         // Handle GET /skiers/{skierID}/vertical
@@ -138,30 +153,53 @@ public class SkierServlet extends HttpServlet {
             return;
         }
 
-        // Handle GET/resorts/{resortID}/seasons/{seasonID}/day/{dayID}/skiers
-        // Handle GET/skiers/{resortID}/seasons/{seasonID}/days/{dayID}/skiers/{skierID}
-        sendErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, "Unknown GET path");
-    }
+        // Handle /resorts/{resortID}/seasons/{seasonID}/day/{dayID}/skiers
+        if ("/resorts".equals(servletPath) && parts.length >= 7 &&
+                "seasons".equals(parts[2]) && "day".equals(parts[4]) &&
+                "skiers".equals(parts[6])) {
+            try {
+                int resortID = Integer.parseInt(parts[1]);
+                String seasonID = parts[3];
+                String dayID = parts[5];
 
+                System.out.println("处理resorts路径: resort=" + resortID + ", season=" + seasonID + ", day=" + dayID);
+                handleGetSkiersByDay(resortID, seasonID, dayID, response);
+                return;
+            } catch (NumberFormatException e) {
+                sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid resortID");
+                return;
+            } catch (Exception e) {
+                e.printStackTrace();
+                sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        "Error processing request: " + e.getMessage());
+                return;
+            }
+        }
+
+        // handle /skiers/{resortID}/seasons/{seasonID}/days/{dayID}/skiers/{skierID}
+
+
+        sendErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, "Unknown GET path: " + pathInfo);
+    }
 
     private void handleGetVertical(int skierID, HttpServletResponse response) throws IOException {
         try {
             DynamoDbClient dynamoDbClient = DynamoDbClient.create();
             String prefix = "2025_"; // fixed season
             QueryRequest request = QueryRequest.builder()
-                .tableName("LiftRides")
-                .keyConditionExpression("skierID = :skierID AND begins_with(dateKey, :prefix)")
-                .expressionAttributeValues(Map.of(
-                    ":skierID", AttributeValue.builder().n(String.valueOf(skierID)).build(),
-                    ":prefix", AttributeValue.builder().s(prefix).build()
-                ))
-                .build();
+                    .tableName("LiftRides")
+                    .keyConditionExpression("skierID = :skierID AND begins_with(dateKey, :prefix)")
+                    .expressionAttributeValues(Map.of(
+                            ":skierID", AttributeValue.builder().n(String.valueOf(skierID)).build(),
+                            ":prefix", AttributeValue.builder().s(prefix).build()
+                    ))
+                    .build();
 
             QueryResponse result = dynamoDbClient.query(request);
 
             int totalVertical = result.items().stream()
-                .mapToInt(item -> Integer.parseInt(item.get("vertical").n()))
-                .sum();
+                    .mapToInt(item -> Integer.parseInt(item.get("vertical").n()))
+                    .sum();
 
             String json = gson.toJson(Map.of("skierID", skierID, "totalVertical", totalVertical));
             response.setStatus(HttpServletResponse.SC_OK);
@@ -175,7 +213,71 @@ public class SkierServlet extends HttpServlet {
     }
 
 
+    /**
+     * Handle GET /resorts/{resortID}/seasons/{seasonID}/day/{dayID}/skiers
+     * Returns a list of skiers at the specified resort on the specified day
+     */
+    private void handleGetSkiersByDay(int resortID, String seasonID, String dayID, HttpServletResponse response) throws IOException {
+        try {
+            DynamoDbClient dynamoDbClient = DynamoDbClient.create();
+            // Create the dateKey prefix for queries (matches how data is stored in DynamoDB)
+            String dateKeyPrefix = seasonID + "_" + dayID + "_";
 
+            // Query DynamoDB for all skiers on this day at this resort using the GSI
+            QueryRequest request = QueryRequest.builder()
+                    .tableName("LiftRides")
+                    .indexName("resortDateIndex") // Use the GSI here
+                    .keyConditionExpression("resortID = :resortID AND begins_with(dateKey, :dateKeyPrefix)")
+                    .expressionAttributeValues(Map.of(
+                            ":resortID", AttributeValue.builder().n(String.valueOf(resortID)).build(),
+                            ":dateKeyPrefix", AttributeValue.builder().s(dateKeyPrefix).build()
+                    ))
+                    .build();
+
+            QueryResponse result = dynamoDbClient.query(request);
+
+            // Extract unique skier IDs and their lift ride data
+            Map<Integer, List<Map<String, Object>>> skierRidesMap = new HashMap<>();
+
+            for (Map<String, AttributeValue> item : result.items()) {
+                int skierID = Integer.parseInt(item.get("skierID").n());
+
+                Map<String, Object> rideData = new HashMap<>();
+                rideData.put("liftID", Integer.parseInt(item.get("liftID").n()));
+                rideData.put("time", Integer.parseInt(item.get("time").n()));
+                rideData.put("vertical", Integer.parseInt(item.get("vertical").n()));
+
+                // Add to map, creating list if needed
+                skierRidesMap.computeIfAbsent(skierID, k -> new ArrayList<>()).add(rideData);
+            }
+
+            // Convert to response format
+            List<Map<String, Object>> skiersList = new ArrayList<>();
+            for (Map.Entry<Integer, List<Map<String, Object>>> entry : skierRidesMap.entrySet()) {
+                Map<String, Object> skierData = new HashMap<>();
+                skierData.put("skierID", entry.getKey());
+                skierData.put("liftRides", entry.getValue());
+                skiersList.add(skierData);
+            }
+
+            // Create and send the response
+            Map<String, Object> responseMap = new HashMap<>();
+            responseMap.put("resortID", resortID);
+            responseMap.put("seasonID", seasonID);
+            responseMap.put("dayID", dayID);
+            responseMap.put("skiers", skiersList);
+
+            String json = gson.toJson(responseMap);
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.setContentType("application/json");
+            response.getWriter().write(json);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Failed to get skiers for day: " + e.getMessage());
+        }
+    }
 
 
     /**
@@ -201,5 +303,4 @@ public class SkierServlet extends HttpServlet {
             out.write("{\"message\":\"" + message + "\"}");
         }
     }
-
 }
