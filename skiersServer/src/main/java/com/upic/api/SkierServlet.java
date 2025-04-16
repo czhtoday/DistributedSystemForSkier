@@ -367,17 +367,41 @@ public class SkierServlet extends HttpServlet {
             // Extract unique skier IDs and their lift ride data
             Map<Integer, List<Map<String, Object>>> skierRidesMap = new HashMap<>();
 
+//            for (Map<String, AttributeValue> item : result.items()) {
+//                int skierID = Integer.parseInt(item.get("skierID").n());
+//
+//                Map<String, Object> rideData = new HashMap<>();
+//                rideData.put("liftID", Integer.parseInt(item.get("liftID").n()));
+//                rideData.put("time", Integer.parseInt(item.get("time").n()));
+//                rideData.put("vertical", Integer.parseInt(item.get("vertical").n()));
+//
+//                // Add to map, creating list if needed
+//                skierRidesMap.computeIfAbsent(skierID, k -> new ArrayList<>()).add(rideData);
+//            }
+
             for (Map<String, AttributeValue> item : result.items()) {
+                // 检查关键属性是否存在
+                if (item.get("skierID") == null || item.get("liftID") == null || item.get("time") == null) {
+                    // 如果这些属性缺失，跳过这条记录
+                    continue;
+                }
+                // 对于 vertical，如果缺失，设置一个默认值（例如 0）
                 int skierID = Integer.parseInt(item.get("skierID").n());
+                int liftID = Integer.parseInt(item.get("liftID").n());
+                int time = Integer.parseInt(item.get("time").n());
+                int vertical = (item.get("vertical") != null && item.get("vertical").n() != null)
+                    ? Integer.parseInt(item.get("vertical").n())
+                    : 0;  // 或者选择跳过这条记录
 
                 Map<String, Object> rideData = new HashMap<>();
-                rideData.put("liftID", Integer.parseInt(item.get("liftID").n()));
-                rideData.put("time", Integer.parseInt(item.get("time").n()));
-                rideData.put("vertical", Integer.parseInt(item.get("vertical").n()));
+                rideData.put("liftID", liftID);
+                rideData.put("time", time);
+                rideData.put("vertical", vertical);
 
                 // Add to map, creating list if needed
                 skierRidesMap.computeIfAbsent(skierID, k -> new ArrayList<>()).add(rideData);
             }
+
 
             // Convert to response format
             List<Map<String, Object>> skiersList = new ArrayList<>();
@@ -399,12 +423,18 @@ public class SkierServlet extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_OK);
             response.setContentType("application/json");
             response.getWriter().write(json);
-
         } catch (Exception e) {
             e.printStackTrace();
+            String errorMessage = (e.getMessage() != null) ? e.getMessage() : e.toString();
             sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "Failed to get skiers for day: " + e.getMessage());
+                "Failed to get skiers for day: " + errorMessage);
         }
+
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+//                    "Failed to get skiers for day: " + e.getMessage());
+//        }
     }
 
     /**

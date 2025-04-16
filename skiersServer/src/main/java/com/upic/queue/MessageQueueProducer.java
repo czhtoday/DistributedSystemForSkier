@@ -8,12 +8,13 @@ import com.upic.model.LiftRide;
 
 public class MessageQueueProducer {
   private static final String QUEUE_NAME = "lift_ride_queue";
-//  private static final String RABBITMQ_HOST = "44.238.46.159"; // RabbitMQ server IP
-//  private static final String RABBITMQ_USER = "admin"; // RabbitMQ username
-//  private static final String RABBITMQ_PASS = "password123"; // RabbitMQ password
-  private static final String RABBITMQ_HOST = "localhost"; // local RabbitMQ
-  private static final String RABBITMQ_USER = "guest"; // default user
-  private static final String RABBITMQ_PASS = "guest"; // default password
+  private static final String RABBITMQ_HOST = "54.189.112.229"; // RabbitMQ server IP
+  private static final String RABBITMQ_USER = "guest"; // RabbitMQ username
+  private static final String RABBITMQ_PASS = "guest"; // RabbitMQ password
+
+  //private static final String RABBITMQ_HOST = "localhost"; // local RabbitMQ
+  //private static final String RABBITMQ_USER = "guest"; // default user
+  //private static final String RABBITMQ_PASS = "guest"; // default password
 
   private static final Gson gson = new Gson();
 
