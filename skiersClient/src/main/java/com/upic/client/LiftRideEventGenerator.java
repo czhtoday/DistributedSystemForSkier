@@ -28,5 +28,5 @@ public class LiftRideEventGenerator {
   }
 
   public static final String SEASON_ID = "2025";  // Fixed season
-  public static final String DAY_ID = "2";        // Fixed day
+  public static final String DAY_ID = "1";        // Fixed day
 }

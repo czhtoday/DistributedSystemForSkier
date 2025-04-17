@@ -1,0 +1,3 @@
+Label,# Samples,Average,Min,Max,Std. Dev.,Error %,Throughput,Received KB/sec,Sent KB/sec,Avg. Bytes
+Get skier data,64000,1572,25,31359,1692.99,16.903%,78.55517,24.60,13.26,320.7
+TOTAL,64000,1572,25,31359,1692.99,16.903%,78.55517,24.60,13.26,320.7

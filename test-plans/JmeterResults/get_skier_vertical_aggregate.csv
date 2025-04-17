@@ -1,0 +1,3 @@
+Label,# Samples,Average,Median,90% Line,95% Line,99% Line,Min,Max,Error %,Throughput,Received KB/sec,Sent KB/sec
+GET skier vertical,10179,1609,1281,4206,4580,6146,16,9135,16.043%,76.50910,17.47,13.64
+TOTAL,10179,1609,1281,4206,4580,6146,16,9135,16.043%,76.50910,17.47,13.64
