@@ -5,9 +5,9 @@ import com.rabbitmq.client.ConnectionFactory;
 
 public class RabbitMQConfig {
 //  private static final String RABBITMQ_HOST = "localhost";
-  private static final String RABBITMQ_HOST = "44.238.46.159"; // RabbitMQ server IP
-  private static final String RABBITMQ_USER = "admin";
-  private static final String RABBITMQ_PASS = "password123";
+  private static final String RABBITMQ_HOST = "54.189.112.229"; // RabbitMQ server IP
+  private static final String RABBITMQ_USER = "guest";
+  private static final String RABBITMQ_PASS = "guest";
 
   private static Connection connection;
 

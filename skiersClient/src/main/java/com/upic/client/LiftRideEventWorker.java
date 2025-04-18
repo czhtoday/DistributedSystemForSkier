@@ -42,7 +42,7 @@ public class LiftRideEventWorker implements Runnable {
     // Uncomment the following line for local testing
 //    apiClient.setBasePath("http://54.245.205.23:8080"); // My EC2 Spring Boot deployment
 //    apiClient.setBasePath("http://54.245.205.23:8080/skiers-server-Servlet_war"); // My EC2 Servlet deployment
-    apiClient.setBasePath("http://54.245.205.23:8080/skiersServer_war");
+    apiClient.setBasePath("http://54.218.63.141:8080/skiersServer");
 //    apiClient.setBasePath("http://44.247.192.247:8080/skiersServer_war");
 //    apiClient.setBasePath("http://skiers-load-balancer-89222294.us-west-2.elb.amazonaws.com/skiersServer_war");
 

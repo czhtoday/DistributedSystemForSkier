@@ -15,10 +15,10 @@ import java.util.concurrent.TimeoutException;
  */
 public class MessageQueueConsumer {
   private static final String QUEUE_NAME = "lift_ride_queue";
-  private static final String RABBITMQ_HOST = "44.238.46.159"; // RabbitMQ server IP
+  private static final String RABBITMQ_HOST = "54.189.112.229"; // RabbitMQ server IP
 //  private static final String RABBITMQ_HOST = "localhost"; // Local test, will be replaced with RabbitMQ EC2 address
-  private static final String RABBITMQ_USER = "admin";
-  private static final String RABBITMQ_PASS = "password123";
+  private static final String RABBITMQ_USER = "guest";
+  private static final String RABBITMQ_PASS = "guest";
 
   private static final Gson gson = new Gson();
 

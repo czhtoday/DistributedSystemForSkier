@@ -367,17 +367,30 @@ public class SkierServlet extends HttpServlet {
             // Extract unique skier IDs and their lift ride data
             Map<Integer, List<Map<String, Object>>> skierRidesMap = new HashMap<>();
 
+
             for (Map<String, AttributeValue> item : result.items()) {
+                // Check if required properties exist
+                if (item.get("skierID") == null || item.get("liftID") == null || item.get("time") == null) {
+                    // Skip record if missing required properties
+                    continue;
+                }
+                // For vertical, if missing, set a default value (i.e. 0)
                 int skierID = Integer.parseInt(item.get("skierID").n());
+                int liftID = Integer.parseInt(item.get("liftID").n());
+                int time = Integer.parseInt(item.get("time").n());
+                int vertical = (item.get("vertical") != null && item.get("vertical").n() != null)
+                    ? Integer.parseInt(item.get("vertical").n())
+                    : 0;  // Default to zero if vertical is missing
 
                 Map<String, Object> rideData = new HashMap<>();
-                rideData.put("liftID", Integer.parseInt(item.get("liftID").n()));
-                rideData.put("time", Integer.parseInt(item.get("time").n()));
-                rideData.put("vertical", Integer.parseInt(item.get("vertical").n()));
+                rideData.put("liftID", liftID);
+                rideData.put("time", time);
+                rideData.put("vertical", vertical);
 
                 // Add to map, creating list if needed
                 skierRidesMap.computeIfAbsent(skierID, k -> new ArrayList<>()).add(rideData);
             }
+
 
             // Convert to response format
             List<Map<String, Object>> skiersList = new ArrayList<>();
@@ -399,12 +412,13 @@ public class SkierServlet extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_OK);
             response.setContentType("application/json");
             response.getWriter().write(json);
-
         } catch (Exception e) {
             e.printStackTrace();
+            String errorMessage = (e.getMessage() != null) ? e.getMessage() : e.toString();
             sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "Failed to get skiers for day: " + e.getMessage());
+                "Failed to get skiers for day: " + errorMessage);
         }
+
     }
 
     /**

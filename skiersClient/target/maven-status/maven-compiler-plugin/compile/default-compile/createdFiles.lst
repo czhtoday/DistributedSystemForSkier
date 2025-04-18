@@ -1,0 +1,7 @@
+com/upic/client/LiftRideEventQueue.class
+com/upic/client/SkiersApiTest.class
+com/upic/client/LiftRideEvent.class
+com/upic/client/LiftRideEventGeneratorTest.class
+com/upic/client/LiftRideEventWorker.class
+com/upic/client/LiftRideEventGenerator.class
+com/upic/client/MainClient.class
