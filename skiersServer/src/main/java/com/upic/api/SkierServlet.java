@@ -367,31 +367,20 @@ public class SkierServlet extends HttpServlet {
             // Extract unique skier IDs and their lift ride data
             Map<Integer, List<Map<String, Object>>> skierRidesMap = new HashMap<>();
 
-//            for (Map<String, AttributeValue> item : result.items()) {
-//                int skierID = Integer.parseInt(item.get("skierID").n());
-//
-//                Map<String, Object> rideData = new HashMap<>();
-//                rideData.put("liftID", Integer.parseInt(item.get("liftID").n()));
-//                rideData.put("time", Integer.parseInt(item.get("time").n()));
-//                rideData.put("vertical", Integer.parseInt(item.get("vertical").n()));
-//
-//                // Add to map, creating list if needed
-//                skierRidesMap.computeIfAbsent(skierID, k -> new ArrayList<>()).add(rideData);
-//            }
 
             for (Map<String, AttributeValue> item : result.items()) {
-                // 检查关键属性是否存在
+                // Check if required properties exist
                 if (item.get("skierID") == null || item.get("liftID") == null || item.get("time") == null) {
-                    // 如果这些属性缺失，跳过这条记录
+                    // Skip record if missing required properties
                     continue;
                 }
-                // 对于 vertical，如果缺失，设置一个默认值（例如 0）
+                // For vertical, if missing, set a default value (i.e. 0)
                 int skierID = Integer.parseInt(item.get("skierID").n());
                 int liftID = Integer.parseInt(item.get("liftID").n());
                 int time = Integer.parseInt(item.get("time").n());
                 int vertical = (item.get("vertical") != null && item.get("vertical").n() != null)
                     ? Integer.parseInt(item.get("vertical").n())
-                    : 0;  // 或者选择跳过这条记录
+                    : 0;  // Default to zero if vertical is missing
 
                 Map<String, Object> rideData = new HashMap<>();
                 rideData.put("liftID", liftID);
@@ -430,11 +419,6 @@ public class SkierServlet extends HttpServlet {
                 "Failed to get skiers for day: " + errorMessage);
         }
 
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-//                    "Failed to get skiers for day: " + e.getMessage());
-//        }
     }
 
     /**
